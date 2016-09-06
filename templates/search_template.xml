@@ -1,0 +1,3 @@
+<q:query xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3">
+%payload%
+</q:query>
