@@ -64,19 +64,12 @@ class Api():
 
 		# Prase response  and return
 		data = xml_parser.Parser(response.content).metadata
-		# Parser will return an empty dict if response is empty
-		#	 will return one dict if only one parent object was returned 
-		#	 will return a dict indexed by top-level object tag
-		#		if top-level object tag has multiple entires with same name 
-		#		the top name will be an index to a list of dicts
-		# In here I'm assuming all objects retunred by midPoint will have 'object' as 
-		# top level name
 		if data:
 			data = data['object']
 			#if isinstance(data, dict):
 			#	data = [data]
 		elif not len(data):
-			data = [{},]
+			data = {}
 		return data 
 	
 	def __modify_object(self, object_type, object_oid, modification):
@@ -95,7 +88,7 @@ class Api():
 		if not unique:
 			return [objects.User(self, user) for user in self.__search_object(objects.Type.USER, search_filter)]
 		else:
-			return [objects.User(self, user) for user in self.__search_object(objects.Type.USER, search_filter)][0]
+			return objects.User(self, self.__search_object(objects.Type.USER, search_filter))
 
 	def get_role(self,role_oid):
 		return objects.Role(self, self.__get_object(objects.Type.ROLE, role_oid))
@@ -107,7 +100,7 @@ class Api():
 		if not unique:
 			return [objects.Role(self, role) for role in self.__search_object(objects.Type.ROLE, search_filter)]
 		else:
-			return [objects.Role(self, role) for role in self.__search_object(objects.Type.ROLE, search_filter)][0]
+			return objects.Role(self, self.__search_object(objects.Type.ROLE, search_filter))
 
 	def get_shadow(self,shadow_oid):
 		return objects.Shadow(self, self.__get_object(objects.Type.SHADOW, shadow_oid))
@@ -119,7 +112,7 @@ class Api():
 		if not unique: 
 			return [objects.Shadow(self, shadow) for shadow in self.__search_object(objects.Type.SHADOW, search_filter)]
 		else:
-			return [objects.Shadow(self, shadow) for shadow in self.__search_object(objects.Type.SHADOW, search_filter)]
+			return objects.Shadow(self, self.__search_object(objects.Type.SHADOW, search_filter))
 	
 	def get_resource(self,resource_oid):
 		return objects.Resource(self, self.__get_object(objects.Type.RESOURCE, resource_oid))
@@ -131,4 +124,4 @@ class Api():
 		if not unqiue:
 			return [objects.Resource(self, resource) for resource in self.__search_object(objects.Type.RESOURCE, search_filter)]
 		else: 
-			return [objects.Resource(self, resource) for resource in self.__search_object(objects.Type.RESOURCE, search_filter)][0]
+			return objects.Resource(self, self.__search_object(objects.Type.RESOURCE, search_filter))

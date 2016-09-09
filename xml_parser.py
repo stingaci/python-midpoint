@@ -2,7 +2,6 @@ import StringIO
 import xml.etree.ElementTree as ElementTree
 from lxml import etree, objectify
 
-from lxml import etree, objectify
 
 class Parser():
 	def __init__(self, raw_xml):
@@ -25,22 +24,6 @@ class XmlnsStriper():
 		####
 		self.stripped = etree.tostring(tree)
 
-
-class XmlListConfig(list):
-	def __init__(self, aList):
-		for element in aList:
-			if len(element):
-			# treat like dict
-				if len(element) == 1 or element[0].tag != element[1].tag:
-					self.append(XmlDictConfig(element))
-			# treat like list
-				elif element[0].tag == element[1].tag:
-					self.append(XmlListConfig(element))
-			elif element.text:
-				text = element.text.strip()
-				if text:
-					self.append(text)
-
 class XmlDictConfig(dict):
 	'''
 	Example usage:
@@ -55,58 +38,50 @@ class XmlDictConfig(dict):
 	>>> xmldict = XmlDictConfig(root)
 
 	And then use xmldict for what it is... a dict.
+
+	This makes a number of assumptions:
+	1. You don't need the top level tag as a key to this dictonary 
+	2. That if the current tag has text value, it won't have any attributes 
+	3. The previous point can be fixed by adding text value to a dict via the 
+	__content__ key. However for the purposes of this use case, this is not required
+	4. Multiple tags that have a matching name will be indexed in a dict via the 
+	tag name and it's value will be a list of all the objects within that tag
 	'''
 	def __init__(self, parent_element):
-		childrenNames = []
-		for child in parent_element.getchildren():
-			childrenNames.append(child.tag)
-
 		if parent_element.items():
 			self.update(dict(parent_element.items()))
-
-		i = 0
-		for element in parent_element:
-			# Midpoint dose not return uniquely identified objects and thus
-			# an xml containting multiple objects will overwrite eachother
-			# in the final dict and so we must ensure that we assign unique
-			# ids to each element 
-			if len(element):
-				# treat like dict - we assume that if the first two tags
-				# in a series are different, then they are all different.
-				if len(element) == 1 or element[0].tag != element[1].tag:
-					aDict = XmlDictConfig(element)
-				# treat like list - we assume that if the first two tags
-				# in a series are the same, then the rest are the same.
-				else:
-				# here, we put the list in dictionary; the key is the
-				# tag name the list elements all share in common, and
-				# the value is the list itself 
-					aDict = {element[0].tag: XmlListConfig(element)}
-				# if the tag has attributes, add those to the dict
-				if element.items():
-					aDict.update(dict(element.items()))
-				if childrenNames.count(element.tag) > 1:
-					try:
-						currentValue = self[element.tag]
-						currentValue.append(aDict)
-						self.update({element.tag: currentValue})
-					except: #the first of its kind, an empty list must be created
-						self.update({element.tag: [aDict]}) #aDict is written in [], i.e. it will be a list
-				else:
-					self.update({element.tag: aDict})
-			# this assumes that if you've got an attribute in a tag,
-			# you won't be having any text. This may or may not be a 
-			# good idea -- time will tell. It works for the way we are
-			# currently doing XML configuration files...
-			elif element.items():
-				self.update({element.tag: dict(element.items())})
-				self[element.tag].update({"__Content__":element.text})
-			# finally, if there are no child tags and no attributes, extract
-			# the text
+		
+		child_count = {}
+		for child in parent_element:
+			if child.tag in child_count:
+				child_count[child.tag] += 1
 			else:
-				self.update({element.tag: element.text})
-
-		for elem in self:
-			if isinstance(self[elem], dict):
-				self[elem] = [self[elem]]
-
+				child_count[child.tag] = 0
+		
+		for child in parent_element:
+			if child_count[child.tag] > 0:
+				if child.tag not in self:
+					if len(child):
+						self[child.tag] = [XmlDictConfig(child)]	
+					else:
+						if child.text == None:
+							self[child.tag] = [dict(child.items())]	
+						else:
+							self[child.tag] = [child.text]	
+				else: 
+					if len(child):
+						self[child.tag].append(XmlDictConfig(child))
+					else:
+						if child.text == None:
+							self[child.tag].append(dict(child.items()))
+						else:
+							self[child.tag].append(child.text)
+			else: 
+				if len(child):
+					self[child.tag] = XmlDictConfig(child)
+				else:
+					self[child.tag] = child.text
+					if child.text == None:
+						self[child.tag] = dict(child.items())
+					else:
+						self[child.tag] = child.text
