@@ -4,7 +4,7 @@ python-midpoint
 
 Overview
 --------
-This is a python library for interacting with midpoint. It's actually a warpper around midPoint's existing RESTfull API and as such perfromance may suffer. 
+This is a python library for interacting with midpoint. It's actually a wrapper around midPoint's existing RESTfull API and as such performance may suffer. 
 
 
 Exiting Features
@@ -16,12 +16,12 @@ As of the last commit there is support for the following objects:
 * Resources 
 * Shadows 
 
-Most of the operations are limitied to reading existing objects and modifying them via MidPoint's itemDelta mechanism. Error handling is very poor at the moment and the use of this library assumes that it's used behind a client (yet to be developed) as any enocuntered errors will result in an error message and a sys.exit() call. This will be addressed in future iterattions. 
+Most of the operations are limited to reading existing objects and modifying them via MidPoint's itemDelta mechanism. Error handling is very poor at the moment and the use of this library assumes that it's used behind a client (yet to be developed) as any encountered errors will result in an error message and a sys.exit() call. This will be addressed in future iterations. 
 
 Search and Modify
 -----------------
 
-As of the latest commit there is no validation for the subbmited search filters and modifications. This will be improved in the future. 
+As of the latest commit there is no validation for the submitted search filters and modifications. This will be improved in the future. 
 
 Search filters for search operations are defined as dicts of the following format:
 
@@ -42,7 +42,7 @@ create_role("my_new_role", {"requestable":"true"})
 Future
 ------
 
-* Support for object delition 
+* Support for object deletion 
 * Support for resource creation (validation of attributes will be a hassle)
 * Proper error handling for both input validation as well as HTTP response handling 
 * A command client interface
