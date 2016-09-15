@@ -5,12 +5,14 @@ import objects
 import methods 
 import templates
 import xml_parser
+import validator
 
 
 class Api():
 	def __init__(self, cfg_file='./midpoint.cfg', logFile=None):
 		self.logger = Logger()
 		self.connection = {}
+		self.validate = validator.Validate(self.logger)
 		self.read_config(cfg_file)
 	
 	def read_config(self, cfg_file):
@@ -48,6 +50,9 @@ class Api():
 	def __craft_modification(self, modification):
 		return templates.Template(templates.Type.MODIFY, modification).get_payload()
 
+	def __craft_create(self, object_type, metadata):
+		return templates.Template(templates.Type.CREATE+object_type, metadata).get_payload()
+
 	def __get_object(self, object_type, object_oid):
 		url = self.url + object_type + '/' + object_oid
 		request = methods.Method(url,self.connection['credentials'],methods.Type.GET) 
@@ -78,6 +83,19 @@ class Api():
 		response = request.execute()
 		return response
 
+	def __create_object(self, object_type, metadata):
+		url = self.url + object_type 
+		request = methods.Method(url,self.connection['credentials'],methods.Type.POST, payload=self.__craft_create(object_type,metadata)) 
+		response = request.execute()
+		return response.headers['location'].split('/')[-1]
+
+	def create_user(self, name, metadata):
+		if self.search_users({'search_operator':'and','search_filter':{'name':name}}, unique=True).metadata != {}:
+			self.logger.write(Logger.FAIL, "User with name: " + name + " already exists")
+		metadata['name'] = name
+		if self.validate.check(validator.Type.CREATE + objects.Type.USER, metadata):
+			return self.__create_object(objects.Type.USER, metadata)
+
 	def get_user(self,user_oid):
 		return objects.User(self, self.__get_object(objects.Type.USER, user_oid))
 
@@ -89,6 +107,13 @@ class Api():
 			return [objects.User(self, user) for user in self.__search_object(objects.Type.USER, search_filter)]
 		else:
 			return objects.User(self, self.__search_object(objects.Type.USER, search_filter))
+
+	def create_role(self, name, metadata):
+		if self.search_roles({'search_operator':'and','search_filter':{'name':name}}, unique=True).metadata != {}:
+			self.logger.write(Logger.FAIL, "Role with name: " + name + " already exists")
+		metadata['name'] = name
+		if self.validate.check(validator.Type.CREATE + objects.Type.ROLE, metadata):
+			return self.get_role(self.__create_object(objects.Type.ROLE, metadata))
 
 	def get_role(self,role_oid):
 		return objects.Role(self, self.__get_object(objects.Type.ROLE, role_oid))
