@@ -20,3 +20,9 @@ class MissingModification(Exception):
 
 class MissingSearchFilter(Exception):
 	pass
+
+class UnsupportedAttribute(Exception):
+	pass
+
+class MissingNameAttribute(Exception):
+	pass

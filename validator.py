@@ -15,13 +15,14 @@ class Validate():
 
 		for attr in input_dict:
 			if attr not in user_attrs:
-				self.logger.write(Logger.FAIL, " Attribute: " + attr + " is not supported for object of type: " + object_type)
+				raise midpoint_exceptions.UnsupportedAttribute(" Attribute:" + attr + " is not supported for object of type: " + object_type)
 	
 	def __get(self, input_dict):
 		pass
 	def __create(self, input_dict):
 		if 'name' not in input_dict:
-			self.logger.write(Logger.FAIL, "Attribute: name is missing for object of type: User")	
+			raise midpoint_exceptions.MissingNameAttribute("Missing unique identifier: name while attempting to create object")
+
 	def __modify(self, input_dict):
 		try: 
 			with open(self.base+'/templates/modification.types', 'r') as template_file:
