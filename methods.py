@@ -1,4 +1,5 @@
 import requests
+import midpoint_exceptions
 from requests.auth import HTTPBasicAuth
 
 class Type():
@@ -14,4 +15,12 @@ class Method():
 		
 	def execute(self):
 		headers = {'content-type': 'application/xml'}
-		return getattr(requests, self.method_type)(self.method_url, auth=HTTPBasicAuth(self.method_credentials['username'],self.method_credentials['password']),data=self.payload, headers=headers)
+		try: 
+			response = getattr(requests, self.method_type)(self.method_url, auth=HTTPBasicAuth(self.method_credentials['username'],self.method_credentials['password']),data=self.payload, headers=headers, timeout=5)
+			return response
+		except requests.exceptions.ConnectionError as e:
+			raise midpoint_exceptions.ConnectionError(e)
+		except requests.exceptions.Timeout as e:
+			raise midpoint_exceptions.Timeout(e)
+		except requests.exceptions.HTTPError as e:
+			raise midpoint_exceptions.HTTPError(e)

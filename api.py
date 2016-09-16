@@ -7,6 +7,28 @@ import templates
 import xml_parser
 import validator
 
+import functools
+
+
+def decorate_get_one(func):
+	def inner(*args, **kwargs):
+		return get_one(func(*args, **kwargs))
+	return inner
+
+def get_one(li):
+	if len(li) == 1:
+		return li[0]
+	elif len(li) == 0:
+		return None
+	elif len(li) > 1:
+		print "ERROR"
+
+class Type():
+	CREATE = "create"
+	MODIFY = "modify"
+	SEARCH = "search"
+	DELETE = "delete"
+	GET = "get"
 
 class Api():
 	def __init__(self, cfg_file='./midpoint.cfg', logFile=None):
@@ -44,6 +66,9 @@ class Api():
 		else:
 			self.logger.write(Logger.FAIL, "Failed reading configuration file: " + cfg_file + " was not found")
 
+	#####################
+	### Payload Craft ###
+	#####################
 	def __craft_search_filter(self, search_filter):
 		return templates.Template(templates.Type.SEARCH, search_filter).get_payload()
 
@@ -53,100 +78,119 @@ class Api():
 	def __craft_create(self, object_type, metadata):
 		return templates.Template(templates.Type.CREATE+object_type, metadata).get_payload()
 
-	def __get_object(self, object_type, object_oid):
+	######################
+	### Object methods ###
+	######################
+	def __get(self, object_constructor, object_type, *args, **kwargs):
+		metadata = self.__get_request(object_type, *args, **kwargs)
+		if metadata:
+			return object_constructor(self, metadata)
+		return None
+
+	def __get_request(self, object_type, object_oid):
 		url = self.url + object_type + '/' + object_oid
 		request = methods.Method(url,self.connection['credentials'],methods.Type.GET) 
 		response = request.execute()
 
-		# Prase response  and return
+		# Prase response and return
 		return xml_parser.Parser(response.content).metadata
 
-	def __search_object(self, object_type, search_filter):
+	def __search(self, object_constructor, object_type, *args, **kwargs):
+		self.validate.check(Type.SEARCH, object_type, *args, **kwargs)
+		metadatas = self.__search_request(object_type, *args, **kwargs)
+		return [object_constructor(self, m) for m in metadatas]
+
+	def __search_request(self, object_type, search_filter):
 		# Make request
 		url = self.url + object_type + '/search' 
 		request = methods.Method(url,self.connection['credentials'],methods.Type.POST, payload=(self.__craft_search_filter(search_filter))) 
 		response = request.execute()
-
-		# Prase response  and return
 		data = xml_parser.Parser(response.content).metadata
 		if data:
-			data = data['object']
-			#if isinstance(data, dict):
-			#	data = [data]
-		elif not len(data):
-			data = {}
+                        ## This is particular to midPoint as it returns multiple results with the top-level tag as object 
+                        data = data['object']
+                elif not len(data):
+                        data = []
+                if isinstance(data, dict):
+                        data = [data]
+		# Prase response  and return
 		return data 
-	
+
+	def __modify(self, object_constructor, object_type, *args, **kwargs):
+		self.validate.check(Type.MODIFY, object_type, *args, **kwargs)
+		self.__modify_request(object_type, *args, **kwargs)
+
 	def __modify_object(self, object_type, object_oid, modification):
 		url = self.url + object_type + '/' + object_oid
 		request = methods.Method(url,self.connection['credentials'],methods.Type.POST, payload=self.__craft_modification(modification)) 
 		response = request.execute()
 		return response
-
-	def __create_object(self, object_type, metadata):
+	
+	def __create(self, object_constructor, object_type, name, *args, **kwargs):
+		self.validate.check(Type.CREATE, object_type, *args, **kwargs)
+		if gettar(self, "_Api__search_" +object_type)({'search_operator':'and','search_filter':{'name':name}}) == None:
+			obj_oid = self.__create_request(object_type, *args, **kwargs)
+			return self.__get_and_construct(object_type, obj_oid)
+		else:
+			self.logger.write(Logger.FAIL, "Object with type: " + object_type + " with name: " + name + " already exists")
+			
+	def __create_request(self, object_type, metadata):
 		url = self.url + object_type 
 		request = methods.Method(url,self.connection['credentials'],methods.Type.POST, payload=self.__craft_create(object_type,metadata)) 
 		response = request.execute()
 		return response.headers['location'].split('/')[-1]
 
-	def create_user(self, name, metadata):
-		if self.search_users({'search_operator':'and','search_filter':{'name':name}}, unique=True).metadata != {}:
-			self.logger.write(Logger.FAIL, "User with name: " + name + " already exists")
-		metadata['name'] = name
-		if self.validate.check(validator.Type.CREATE + objects.Type.USER, metadata):
-			return self.__create_object(objects.Type.USER, metadata)
+	##################
+	##### Public #####
+	##################
 
-	def get_user(self,user_oid):
-		return objects.User(self, self.__get_object(objects.Type.USER, user_oid))
+	### Create ####
+	# Input: (name, metadata)##
+	def create_user(self, *args, **kwargs):
+		return self.__create(objects.User, objects.Type.USER, *args, **kwargs)
 
-	def modify_user(self, user_oid, modification):
-		return self.__modify_object(objects.Type.USER, user_oid, modification)	
+	def create_role(self, *args, **kwargs):
+		return self.__create(objects.Role, objects.Type.ROLE, *args, **kwargs)
 
-	def search_users(self,search_filter, unique=False):
-		if not unique:
-			return [objects.User(self, user) for user in self.__search_object(objects.Type.USER, search_filter)]
-		else:
-			return objects.User(self, self.__search_object(objects.Type.USER, search_filter))
+	### Get ###
+	# Input (oid)#
+	def get_role(self,*args, **kwargs):
+		return self.__get(objects.Role, objects.Type.ROLE, *args, **kwargs)
 
-	def create_role(self, name, metadata):
-		if self.search_roles({'search_operator':'and','search_filter':{'name':name}}, unique=True).metadata != {}:
-			self.logger.write(Logger.FAIL, "Role with name: " + name + " already exists")
-		metadata['name'] = name
-		if self.validate.check(validator.Type.CREATE + objects.Type.ROLE, metadata):
-			return self.get_role(self.__create_object(objects.Type.ROLE, metadata))
+	def get_user(self,*args, **kwargs):
+		return self.__get(objects.User, objects.Type.USER, *args, **kwargs)
 
-	def get_role(self,role_oid):
-		return objects.Role(self, self.__get_object(objects.Type.ROLE, role_oid))
+	def get_shadow(self,*args, **kwargs):
+		return self.__get(objects.Shadow, objects.Type.SHADOW, *args, **kwargs)
 
-	def modify_role(self, role_oid, modification):
-		return self.__modify_object(objects.Type.ROLE, role_oid, modification)	
+	def get_resource(self,*args, **kwargs):
+		return self.__get(objects.Resource, objects.Type.RESOURCE, *args, **kwargs)
 
-	def search_roles(self,search_filter, unique=False):
-		if not unique:
-			return [objects.Role(self, role) for role in self.__search_object(objects.Type.ROLE, search_filter)]
-		else:
-			return objects.Role(self, self.__search_object(objects.Type.ROLE, search_filter))
+	### Modify ###
+	# Input ({'modification_type': 'add|delete|replace','modification':{'object_attribute':'attribute_value'}})
+	def modify_role(self, *args, **kwargs):
+		return self.__modify(objects.Type.ROLE, *args, **kwargs) 
+	def modify_user(self, *args, **kwargs):
+		return self.__modify(objects.Type.USER, *args, **kwargs) 
+	def modify_resource(self, *args, **kwargs):
+		return self.__modify(objects.Type.RESOURCE, *args, **kwargs) 
+	def modify_shadow(self, *args, **kwargs):
+		return self.__modify(objects.Type.SHADOW, *args, **kwargs) 
 
-	def get_shadow(self,shadow_oid):
-		return objects.Shadow(self, self.__get_object(objects.Type.SHADOW, shadow_oid))
+	### Search ###
+	# Input: ({'search_operator':'and|or', 'search_filter':{'object_attribute':'attribute_value', 'another_object_attribute':'attribute_value'}})
+	def search_roles(self, *args, **kwargs):
+		return self.__search(objects.Role, objects.Type.ROLE, *args, **kwargs)
+	def search_users(self, *args, **kwargs):
+		return self.__search(objects.User, objects.Type.USER, *args, **kwargs)
+	def search_shadows(self, *args, **kwargs):
+		return self.__search(objects.Shadow, objects.Type.SHADOW, *args, **kwargs)
+	def search_resources(self, *args, **kwargs):
+		return self.__search(objects.Resource, objects.Type.RESOURCE, *args, **kwargs)
 
-	def modify_shadow(self, shadow_oid, modification):
-		return self.__modify_object(objects.Type.SHADOW, shadow_oid, modification)	
+	search_role = decorate_get_one(search_roles)
+	search_user = decorate_get_one(search_users)
+	search_shadow = decorate_get_one(search_shadows)
+	search_resource = decorate_get_one(search_resources)
 
-	def search_shadows(self,search_filter, unqiue=False):
-		if not unique: 
-			return [objects.Shadow(self, shadow) for shadow in self.__search_object(objects.Type.SHADOW, search_filter)]
-		else:
-			return objects.Shadow(self, self.__search_object(objects.Type.SHADOW, search_filter))
-	
-	def get_resource(self,resource_oid):
-		return objects.Resource(self, self.__get_object(objects.Type.RESOURCE, resource_oid))
 
-	def modify_resource(self, resource_oid, modification):
-		return self.__modify_object(objects.Type.RESOURCE, resource_oid, modification)	
-
-	def search_resources(self,search_filter, unqiue=False):
-		if not unqiue:
-			return [objects.Resource(self, resource) for resource in self.__search_object(objects.Type.RESOURCE, search_filter)]
-		else: 
-			return objects.Resource(self, self.__search_object(objects.Type.RESOURCE, search_filter))
