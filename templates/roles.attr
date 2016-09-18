@@ -1,5 +1,8 @@
 name
 requestable
 roleType
-extension/gid
-extension/uid
+assignment
+extension/gidNumber
+approverRef
+approvalSchema
+identifier

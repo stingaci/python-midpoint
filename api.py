@@ -6,8 +6,8 @@ import methods
 import templates
 import xml_parser
 import validator
-
 import functools
+import midpoint_exceptions
 
 
 def decorate_get_one(func):
@@ -116,28 +116,31 @@ class Api():
 		# Prase response  and return
 		return data 
 
-	def __modify(self, object_constructor, object_type, *args, **kwargs):
+	def __modify(self, object_type, *args, **kwargs):
 		self.validate.check(Type.MODIFY, object_type, *args, **kwargs)
 		self.__modify_request(object_type, *args, **kwargs)
 
-	def __modify_object(self, object_type, object_oid, modification):
+	def __modify_request(self, object_type, object_oid, modification):
 		url = self.url + object_type + '/' + object_oid
 		request = methods.Method(url,self.connection['credentials'],methods.Type.POST, payload=self.__craft_modification(modification)) 
 		response = request.execute()
 		return response
 	
-	def __create(self, object_constructor, object_type, name, *args, **kwargs):
+	def __create(self, object_constructor, object_type, *args, **kwargs):
 		self.validate.check(Type.CREATE, object_type, *args, **kwargs)
-		if gettar(self, "_Api__search_" +object_type)({'search_operator':'and','search_filter':{'name':name}}) == None:
+		if getattr(self, "search_" +object_type[:-1])({'search_operator':'and','search_filter':{'name':args[0]}}) == None:
 			obj_oid = self.__create_request(object_type, *args, **kwargs)
-			return self.__get_and_construct(object_type, obj_oid)
+			return self.__get(object_constructor, object_type, obj_oid)
 		else:
-			self.logger.write(Logger.FAIL, "Object with type: " + object_type + " with name: " + name + " already exists")
-			
-	def __create_request(self, object_type, metadata):
+			raise midpoint_exceptions.ConflictingObject("Found conflicting object with name: " + args[0])
+	
+	def __create_request(self, object_type,name, metadata):
 		url = self.url + object_type 
+		metadata['name'] = name
 		request = methods.Method(url,self.connection['credentials'],methods.Type.POST, payload=self.__craft_create(object_type,metadata)) 
 		response = request.execute()
+		print response.status_code
+		print self.__craft_create(object_type,metadata)
 		return response.headers['location'].split('/')[-1]
 
 	##################
@@ -147,7 +150,8 @@ class Api():
 	### Create ####
 	# Input: (name, metadata)##
 	def create_user(self, *args, **kwargs):
-		return self.__create(objects.User, objects.Type.USER, *args, **kwargs)
+		user = self.__create(objects.User, objects.Type.USER, *args, **kwargs)
+		return user
 
 	def create_role(self, *args, **kwargs):
 		return self.__create(objects.Role, objects.Type.ROLE, *args, **kwargs)

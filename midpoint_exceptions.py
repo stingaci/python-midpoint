@@ -26,3 +26,12 @@ class UnsupportedAttribute(Exception):
 
 class MissingNameAttribute(Exception):
 	pass
+
+class MissingParameters(Exception):
+	pass
+
+class UnexpectedAttributeType(Exception):
+	pass
+
+class ConflictingObject(Exception):
+	pass

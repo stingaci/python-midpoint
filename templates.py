@@ -53,7 +53,7 @@ class Template:
 		payload = ''
 		for (attr, value) in template_dict.iteritems():
 			if 'extension' in attr:
-				extension[attr] = value
+				extension[attr.split('/')[1]] = value
 			else:
 				payload += '<' + attr + '>' + value + '</' + attr + '>'
 		if extension != {}:

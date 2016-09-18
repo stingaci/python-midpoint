@@ -3,5 +3,7 @@ fullName
 givenName
 familyName
 emailAddress
-extension/gid
-extension/uid
+employeeType
+assignment
+extension/gidNumber
+extension/uidNumber

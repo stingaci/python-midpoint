@@ -5,6 +5,7 @@ from requests.auth import HTTPBasicAuth
 class Type():
         GET='get'
 	POST='post'
+	DELETE='delete'
 
 class Method():
 	def __init__(self, method_url, method_credentials, method_type, payload=None):
