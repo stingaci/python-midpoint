@@ -14,6 +14,7 @@ class Logger:
         INFO = Colors.OKBLUE + "INFO: "
         SUCCESS = Colors.OKBLUE + "SUCCESS: "
         FAIL = Colors.FAIL + "FAIL: "
+	WARN = Colors.WARNING + "WARN: "
 
         def __init__(self,backupLog=None):
 		if backupLog is not None:

@@ -139,8 +139,6 @@ class Api():
 		metadata['name'] = name
 		request = methods.Method(url,self.connection['credentials'],methods.Type.POST, payload=self.__craft_create(object_type,metadata)) 
 		response = request.execute()
-		print response.status_code
-		print self.__craft_create(object_type,metadata)
 		return response.headers['location'].split('/')[-1]
 
 	##################
